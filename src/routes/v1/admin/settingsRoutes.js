@@ -60,25 +60,28 @@ const platformConfigVerifyVerifyLimiter = rateLimit({
   legacyHeaders: false,
 });
 
+// Platform Config holds Dukana's own Daraja/Paystack credentials plus the
+// approver emails that gate changing them — restricted to super_admin
+// specifically, not just settings.manage. Unlike Plans/Promotions/Push,
+// even *viewing* that credentials are configured or who approves changes to
+// them is sensitive enough that a normal settings.manage admin should never
+// see this surface at all, so the gate sits in front of every route below
+// (GET included), not just the writes.
+router.use('/platform-config', requireSuperAdmin);
+
 router.post('/platform-config/verification/request', platformConfigVerifyRequestLimiter, requestVerification);
 router.post('/platform-config/verification/verify', platformConfigVerifyVerifyLimiter, validate(verifyPlatformConfigSchema), verifyCode);
-// GET is ungated by verification — getPlatformConfig never returns secret
-// values, so there is nothing here worth an approval code. Verification is
-// only enforced on PATCH, and even then only when a credential field is
-// actually being written (see requirePlatformConfigVerification).
 router.get('/platform-config', getPlatformConfig);
 router.patch('/platform-config', requirePlatformConfigVerification, validate(updatePlatformConfigSchema), updatePlatformConfig);
 
-// Approver emails (CEO / approved) that receive the step-up code above.
-// requireSuperAdmin AND a fresh approval code are both required on the
-// PATCH — a regular settings.manage admin may view who to ask for a code,
-// but must never be able to repoint it at themselves, and even a super
-// admin can't change who approves without approval from an existing
-// approver first. See platformConfigController.js and platformConfigSchema.js.
+// Approver emails (CEO / approved) that receive the step-up code above. A
+// fresh approval code is required on top of super_admin for the PATCH —
+// even a super admin can't change who approves without approval from an
+// existing approver first. See platformConfigController.js and
+// platformConfigSchema.js.
 router.get('/platform-config/approvers', getPlatformConfigApprovers);
 router.patch(
   '/platform-config/approvers',
-  requireSuperAdmin,
   requirePlatformConfigVerificationAlways,
   validate(updatePlatformConfigApproversSchema),
   updatePlatformConfigApprovers
