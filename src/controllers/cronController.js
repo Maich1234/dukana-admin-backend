@@ -18,8 +18,11 @@ const verifyCronSecret = (req) => {
 /**
  * GET /cron/commission-accrual — reads successful SubscriptionPayments,
  * matches shop→agent via Onboarding, applies active CommissionRules, and
- * writes CommissionRecords idempotently. Triggered by Vercel Cron every 30
- * minutes (see vercel.json) — a few minutes' lag is acceptable, per spec.
+ * writes CommissionRecords idempotently. Triggered once daily by Vercel Cron
+ * (see vercel.json — Hobby-plan projects can't schedule sub-daily crons; a
+ * day's lag between payment and accrual is acceptable, per spec). Each run
+ * re-scans the full LOOKBACK_DAYS window and skips already-accrued payments,
+ * so cadence only affects latency, never correctness.
  */
 export const commissionAccrualCron = async (req, res) => {
   if (!verifyCronSecret(req)) {

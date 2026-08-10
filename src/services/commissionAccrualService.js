@@ -49,10 +49,11 @@ function computeCommissionAmount(rule, amount) {
 
 /**
  * Runs one accrual pass. Returns a summary object for the cron log/response.
- * Safe to call repeatedly (e.g. every 30 min via Vercel Cron) — already-
- * accrued payments are skipped via a pre-check and, as a last-resort guard
- * against a race between two concurrent runs, the CommissionRecord unique
- * compound index makes a duplicate write a no-op rather than a double-pay.
+ * Safe to call repeatedly (triggered once daily via Vercel Cron — see
+ * vercel.json) — already-accrued payments are skipped via a pre-check and,
+ * as a last-resort guard against a race between two concurrent runs, the
+ * CommissionRecord unique compound index makes a duplicate write a no-op
+ * rather than a double-pay.
  */
 export async function accrueCommissions() {
   const { SubscriptionPayment } = await getSmartDukaModels();

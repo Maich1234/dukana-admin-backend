@@ -15,7 +15,7 @@
  "crons": [
   {
    "path": "/api/v1/cron/commission-accrual",
-   "schedule": "*/30 * * * *"
+   "schedule": "0 4 * * *"
   }
  ]
 }
