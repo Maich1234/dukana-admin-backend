@@ -8,7 +8,7 @@ import {
 } from '../../../controllers/admin/settings/platformConfigController.js';
 import { requestVerification, verifyCode } from '../../../controllers/admin/settings/platformConfigVerificationController.js';
 import { requirePermission, requireSuperAdmin } from '../../../middlewares/adminAuth.js';
-import { requirePlatformConfigVerification } from '../../../services/platformConfigVerificationService.js';
+import { requirePlatformConfigVerification, requirePlatformConfigVerificationAlways } from '../../../services/platformConfigVerificationService.js';
 import validate from '../../../middlewares/validate.js';
 import { createRateLimitStore } from '../../../utils/rateLimitStore.js';
 import {
@@ -70,10 +70,18 @@ router.get('/platform-config', getPlatformConfig);
 router.patch('/platform-config', requirePlatformConfigVerification, validate(updatePlatformConfigSchema), updatePlatformConfig);
 
 // Approver emails (CEO / approved) that receive the step-up code above.
-// requireSuperAdmin on the PATCH only — a regular settings.manage admin may
-// view who to ask for a code, but must never be able to repoint it at
-// themselves. See platformConfigController.js and platformConfigSchema.js.
+// requireSuperAdmin AND a fresh approval code are both required on the
+// PATCH — a regular settings.manage admin may view who to ask for a code,
+// but must never be able to repoint it at themselves, and even a super
+// admin can't change who approves without approval from an existing
+// approver first. See platformConfigController.js and platformConfigSchema.js.
 router.get('/platform-config/approvers', getPlatformConfigApprovers);
-router.patch('/platform-config/approvers', requireSuperAdmin, validate(updatePlatformConfigApproversSchema), updatePlatformConfigApprovers);
+router.patch(
+  '/platform-config/approvers',
+  requireSuperAdmin,
+  requirePlatformConfigVerificationAlways,
+  validate(updatePlatformConfigApproversSchema),
+  updatePlatformConfigApprovers
+);
 
 export default router;

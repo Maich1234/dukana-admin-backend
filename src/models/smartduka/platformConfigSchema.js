@@ -25,14 +25,16 @@ const platformPaystackSchema = new mongoose.Schema({
   configuredAt: { type: Date },
 }, { _id: false });
 
-// Approval-relay recipients for platformConfigVerificationService's OTP —
-// editable only via the super-admin-gated approvers endpoint (see
-// settingsRoutes.js). Deliberately not writable through the same PATCH as
-// the rest of PlatformConfig: a regular admin with only `settings.manage`
-// must never be able to repoint approvals at their own inbox and
-// self-approve credential changes.
+// Second approval-relay recipient for platformConfigVerificationService's
+// OTP, on top of the CEO email — which is intentionally NOT here. The CEO
+// address only ever comes from PLATFORM_CONFIG_APPROVER_EMAILS (env), so
+// changing it requires literal server access; no API path writes it, even
+// for a super admin. approvedEmail is the flexible one — editable via the
+// super-admin-gated approvers endpoint (see settingsRoutes.js), deliberately
+// not writable through the same PATCH as the rest of PlatformConfig, since a
+// regular admin with only `settings.manage` must never be able to repoint
+// approvals at their own inbox and self-approve credential changes.
 const platformApproverEmailsSchema = new mongoose.Schema({
-  ceoEmail: { type: String, trim: true, lowercase: true, default: '' },
   approvedEmail: { type: String, trim: true, lowercase: true, default: '' },
 }, { _id: false });
 

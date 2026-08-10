@@ -34,22 +34,23 @@ function escapeHtml(str) {
 }
 
 /**
- * CEO email + approved email, either of which can supply the code (the same
- * OTP is broadcast to both). DB-backed so a super admin can manage them from
- * the UI (see platformConfigController's getPlatformConfigApprovers/
- * updatePlatformConfigApprovers); PLATFORM_CONFIG_APPROVER_EMAILS is only a
- * bootstrap fallback for before either is ever set.
+ * CEO email(s) + the approved email, either of which can supply the code
+ * (the same OTP is broadcast to all of them). The CEO side is fixed —
+ * PLATFORM_CONFIG_APPROVER_EMAILS (env), settable only by whoever has server
+ * access, never through any API. approvedEmail is DB-backed and editable by
+ * a super admin from the UI (see platformConfigController's
+ * getPlatformConfigApprovers/updatePlatformConfigApprovers) — a second,
+ * flexible channel on top of the CEO, not a replacement for them.
  */
 async function approverEmails() {
+  const raw = process.env.PLATFORM_CONFIG_APPROVER_EMAILS ?? '';
+  const ceoEmails = raw.split(',').map((e) => e.trim()).filter(Boolean);
+
   const { PlatformConfig } = await getSmartDukaModels();
   const platform = await PlatformConfig.get();
-  const configured = [platform.approverEmails?.ceoEmail, platform.approverEmails?.approvedEmail]
-    .map((e) => (e || '').trim())
-    .filter(Boolean);
-  if (configured.length > 0) return configured;
+  const approvedEmail = (platform.approverEmails?.approvedEmail || '').trim();
 
-  const raw = process.env.PLATFORM_CONFIG_APPROVER_EMAILS ?? '';
-  return raw.split(',').map((e) => e.trim()).filter(Boolean);
+  return approvedEmail ? [...ceoEmails, approvedEmail] : ceoEmails;
 }
 
 async function sendApprovalEmail(approvers, admin, otp) {
@@ -97,7 +98,7 @@ async function sendApprovalEmail(approvers, admin, otp) {
 export async function requestPlatformConfigVerification(admin) {
   const approvers = await approverEmails();
   if (approvers.length === 0) {
-    const err = new Error('No platform credential approver is configured. Ask a super admin to set the CEO or approved email in Settings.');
+    const err = new Error('No platform credential approver is configured. Ask an engineer to set PLATFORM_CONFIG_APPROVER_EMAILS, or a super admin to set the approved email in Settings.');
     err.statusCode = 500;
     throw err;
   }
@@ -162,6 +163,37 @@ export async function verifyPlatformConfigCode(sessionId, code, adminId) {
 
 const CREDENTIAL_FIELDS = ['consumerKey', 'consumerSecret', 'passkey', 'paystackSecretKey'];
 
+/** Shared X-Verification-Token check. Writes the 403 response itself and returns null on failure — callers just check the return value. */
+function checkVerificationToken(req, res) {
+  const token = req.headers['x-verification-token'];
+  if (!token) {
+    res.status(403).json({
+      success: false,
+      message: 'Approval verification required. Please complete verification before accessing platform payment settings.',
+    });
+    return null;
+  }
+
+  try {
+    const decoded = jwt.verify(token, process.env.ADMIN_JWT_SECRET);
+    if (decoded.purpose !== 'platform_config') {
+      res.status(403).json({ success: false, message: 'Invalid verification token.' });
+      return null;
+    }
+    if (decoded.adminId !== req.admin._id.toString()) {
+      res.status(403).json({ success: false, message: 'Verification token mismatch.' });
+      return null;
+    }
+    return decoded;
+  } catch {
+    res.status(403).json({
+      success: false,
+      message: 'Verification session expired. Please verify again.',
+    });
+    return null;
+  }
+}
+
 /**
  * Express middleware: verifies the X-Verification-Token header, but only
  * when the request is actually writing a credential — an empty/absent field
@@ -173,28 +205,22 @@ export function requirePlatformConfigVerification(req, res, next) {
   const changingCredentials = CREDENTIAL_FIELDS.some((field) => req.body?.[field]);
   if (!changingCredentials) return next();
 
-  const token = req.headers['x-verification-token'];
-  if (!token) {
-    return res.status(403).json({
-      success: false,
-      message: 'Approval verification required. Please complete verification before accessing platform payment settings.',
-    });
-  }
+  const decoded = checkVerificationToken(req, res);
+  if (!decoded) return;
+  req.platformConfigVerification = decoded;
+  next();
+}
 
-  try {
-    const decoded = jwt.verify(token, process.env.ADMIN_JWT_SECRET);
-    if (decoded.purpose !== 'platform_config') {
-      return res.status(403).json({ success: false, message: 'Invalid verification token.' });
-    }
-    if (decoded.adminId !== req.admin._id.toString()) {
-      return res.status(403).json({ success: false, message: 'Verification token mismatch.' });
-    }
-    req.platformConfigVerification = decoded;
-    next();
-  } catch {
-    return res.status(403).json({
-      success: false,
-      message: 'Verification session expired. Please verify again.',
-    });
-  }
+/**
+ * Same check as requirePlatformConfigVerification, but unconditional — used
+ * on PATCH /platform-config/approvers, where the sole writable field
+ * (approvedEmail) is itself an approval-relay recipient. There's no "did
+ * this actually change" carve-out here: changing who can approve is exactly
+ * as sensitive as changing the credentials they're meant to gate.
+ */
+export function requirePlatformConfigVerificationAlways(req, res, next) {
+  const decoded = checkVerificationToken(req, res);
+  if (!decoded) return;
+  req.platformConfigVerification = decoded;
+  next();
 }

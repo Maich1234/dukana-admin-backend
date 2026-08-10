@@ -106,9 +106,11 @@ export const updatePlatformConfig = async (req, res) => {
 
 /**
  * GET /admin/settings/platform-config/approvers — the CEO/approved emails
- * that platformConfigVerificationService relays approval codes to. Readable
- * by anyone with settings.manage (so a non-super-admin knows who to ask for
- * a code); only the PATCH below is super-admin-gated.
+ * that platformConfigVerificationService relays approval codes to.
+ * `ceoEmail` is read straight from PLATFORM_CONFIG_APPROVER_EMAILS (env) —
+ * included here purely for display, never writable via this or any other
+ * API. Readable by anyone with settings.manage (so a non-super-admin knows
+ * who to ask for a code); only the PATCH below is super-admin-gated.
  */
 export const getPlatformConfigApprovers = async (req, res) => {
   const { PlatformConfig } = await getSmartDukaModels();
@@ -116,29 +118,32 @@ export const getPlatformConfigApprovers = async (req, res) => {
   res.json({
     success: true,
     data: {
-      ceoEmail: platform.approverEmails?.ceoEmail ?? '',
+      ceoEmail: process.env.PLATFORM_CONFIG_APPROVER_EMAILS ?? '',
       approvedEmail: platform.approverEmails?.approvedEmail ?? '',
     },
   });
 };
 
 /**
- * PATCH /admin/settings/platform-config/approvers — requireSuperAdmin is
- * enforced at the route level (see settingsRoutes.js), not here: this is the
- * one write in the whole Settings surface that a regular `settings.manage`
- * admin must never reach, since repointing these emails at yourself would
- * let you self-approve platform credential changes.
+ * PATCH /admin/settings/platform-config/approvers — only writes
+ * approvedEmail (see updatePlatformConfigApproversSchema, which doesn't even
+ * accept a ceoEmail key). requireSuperAdmin is enforced at the route level
+ * (see settingsRoutes.js), not here: this is the one write in the whole
+ * Settings surface that a regular `settings.manage` admin must never reach,
+ * since repointing this email at yourself would let you self-approve
+ * platform credential changes. The CEO email has no write path at all —
+ * changing it requires editing PLATFORM_CONFIG_APPROVER_EMAILS on the
+ * server, which closes that escalation route even for a super admin.
  */
 export const updatePlatformConfigApprovers = async (req, res) => {
   const { PlatformConfig } = await getSmartDukaModels();
   const platform = await PlatformConfig.get();
-  const { ceoEmail, approvedEmail } = req.body;
+  const { approvedEmail } = req.body;
 
   const approverEmails = platform.approverEmails?.toObject
     ? platform.approverEmails.toObject()
     : { ...(platform.approverEmails ?? {}) };
-  if (ceoEmail !== undefined) approverEmails.ceoEmail = ceoEmail;
-  if (approvedEmail !== undefined) approverEmails.approvedEmail = approvedEmail;
+  approverEmails.approvedEmail = approvedEmail;
   platform.approverEmails = approverEmails;
 
   await platform.save();

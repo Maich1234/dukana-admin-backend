@@ -127,13 +127,14 @@ export const updatePlatformConfigSchema = Joi.object({
   reminderDaysBefore: Joi.array().items(Joi.number().min(0)),
 }).unknown(false).min(1);
 
-// Empty string is allowed so a super admin can clear one email while
-// keeping the other — requestPlatformConfigVerification already fails
-// closed (falls back to the env var, then errors) if both end up empty.
+// ceoEmail is deliberately not a field here — it only ever comes from
+// PLATFORM_CONFIG_APPROVER_EMAILS (env), so this endpoint has no write path
+// for it at all, even for a super admin. Empty string is allowed so
+// approvedEmail can be cleared back to "unset" (requestPlatformConfigVerification
+// still has the env-sourced CEO email to fall back on).
 export const updatePlatformConfigApproversSchema = Joi.object({
-  ceoEmail: Joi.string().trim().lowercase().email().allow(''),
-  approvedEmail: Joi.string().trim().lowercase().email().allow(''),
-}).unknown(false).min(1);
+  approvedEmail: Joi.string().trim().lowercase().email().allow('').required(),
+}).unknown(false);
 
 export const verifyPlatformConfigSchema = Joi.object({
   sessionId: Joi.string().required(),
