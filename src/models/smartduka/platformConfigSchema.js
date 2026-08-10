@@ -25,10 +25,22 @@ const platformPaystackSchema = new mongoose.Schema({
   configuredAt: { type: Date },
 }, { _id: false });
 
+// Approval-relay recipients for platformConfigVerificationService's OTP —
+// editable only via the super-admin-gated approvers endpoint (see
+// settingsRoutes.js). Deliberately not writable through the same PATCH as
+// the rest of PlatformConfig: a regular admin with only `settings.manage`
+// must never be able to repoint approvals at their own inbox and
+// self-approve credential changes.
+const platformApproverEmailsSchema = new mongoose.Schema({
+  ceoEmail: { type: String, trim: true, lowercase: true, default: '' },
+  approvedEmail: { type: String, trim: true, lowercase: true, default: '' },
+}, { _id: false });
+
 const platformConfigSchema = new mongoose.Schema({
   key: { type: String, default: 'platform', unique: true },
   mpesa: { type: platformMpesaSchema, default: () => ({}) },
   paystack: { type: platformPaystackSchema, default: () => ({}) },
+  approverEmails: { type: platformApproverEmailsSchema, default: () => ({}) },
   immediateSeatBilling: { type: Boolean, default: false },
   gracePeriodDays: { type: Number, default: 3, min: 0 },
   staffGraceExtraDays: { type: Number, default: 7, min: 0 },

@@ -103,3 +103,54 @@ export const updatePlatformConfig = async (req, res) => {
 
   return getPlatformConfig(req, res);
 };
+
+/**
+ * GET /admin/settings/platform-config/approvers — the CEO/approved emails
+ * that platformConfigVerificationService relays approval codes to. Readable
+ * by anyone with settings.manage (so a non-super-admin knows who to ask for
+ * a code); only the PATCH below is super-admin-gated.
+ */
+export const getPlatformConfigApprovers = async (req, res) => {
+  const { PlatformConfig } = await getSmartDukaModels();
+  const platform = await PlatformConfig.get();
+  res.json({
+    success: true,
+    data: {
+      ceoEmail: platform.approverEmails?.ceoEmail ?? '',
+      approvedEmail: platform.approverEmails?.approvedEmail ?? '',
+    },
+  });
+};
+
+/**
+ * PATCH /admin/settings/platform-config/approvers — requireSuperAdmin is
+ * enforced at the route level (see settingsRoutes.js), not here: this is the
+ * one write in the whole Settings surface that a regular `settings.manage`
+ * admin must never reach, since repointing these emails at yourself would
+ * let you self-approve platform credential changes.
+ */
+export const updatePlatformConfigApprovers = async (req, res) => {
+  const { PlatformConfig } = await getSmartDukaModels();
+  const platform = await PlatformConfig.get();
+  const { ceoEmail, approvedEmail } = req.body;
+
+  const approverEmails = platform.approverEmails?.toObject
+    ? platform.approverEmails.toObject()
+    : { ...(platform.approverEmails ?? {}) };
+  if (ceoEmail !== undefined) approverEmails.ceoEmail = ceoEmail;
+  if (approvedEmail !== undefined) approverEmails.approvedEmail = approvedEmail;
+  platform.approverEmails = approverEmails;
+
+  await platform.save();
+
+  logAudit({
+    adminId: req.admin._id,
+    action: 'admin.platform_config.approvers_updated',
+    entityType: 'PlatformConfig',
+    entityId: platform._id,
+    details: { fieldsChanged: Object.keys(req.body) },
+    req,
+  }).catch(() => {});
+
+  return getPlatformConfigApprovers(req, res);
+};

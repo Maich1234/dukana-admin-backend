@@ -3,15 +3,17 @@ import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
 import { listPlans, createPlan, updatePlan } from '../../../controllers/admin/settings/plansController.js';
 import { listPromotions, createPromotion, updatePromotion } from '../../../controllers/admin/settings/promotionsController.js';
 import { listPushCampaigns, createPushCampaign, sendPushCampaign, cancelPushCampaign } from '../../../controllers/admin/settings/pushCampaignsController.js';
-import { getPlatformConfig, updatePlatformConfig } from '../../../controllers/admin/settings/platformConfigController.js';
+import {
+  getPlatformConfig, updatePlatformConfig, getPlatformConfigApprovers, updatePlatformConfigApprovers,
+} from '../../../controllers/admin/settings/platformConfigController.js';
 import { requestVerification, verifyCode } from '../../../controllers/admin/settings/platformConfigVerificationController.js';
-import { requirePermission } from '../../../middlewares/adminAuth.js';
+import { requirePermission, requireSuperAdmin } from '../../../middlewares/adminAuth.js';
 import { requirePlatformConfigVerification } from '../../../services/platformConfigVerificationService.js';
 import validate from '../../../middlewares/validate.js';
 import { createRateLimitStore } from '../../../utils/rateLimitStore.js';
 import {
   createPlanSchema, updatePlanSchema, createPromotionSchema, updatePromotionSchema,
-  createPushCampaignSchema, updatePlatformConfigSchema, verifyPlatformConfigSchema,
+  createPushCampaignSchema, updatePlatformConfigSchema, updatePlatformConfigApproversSchema, verifyPlatformConfigSchema,
 } from '../../../validations/settingsValidation.js';
 
 const router = express.Router();
@@ -66,5 +68,12 @@ router.post('/platform-config/verification/verify', platformConfigVerifyVerifyLi
 // actually being written (see requirePlatformConfigVerification).
 router.get('/platform-config', getPlatformConfig);
 router.patch('/platform-config', requirePlatformConfigVerification, validate(updatePlatformConfigSchema), updatePlatformConfig);
+
+// Approver emails (CEO / approved) that receive the step-up code above.
+// requireSuperAdmin on the PATCH only — a regular settings.manage admin may
+// view who to ask for a code, but must never be able to repoint it at
+// themselves. See platformConfigController.js and platformConfigSchema.js.
+router.get('/platform-config/approvers', getPlatformConfigApprovers);
+router.patch('/platform-config/approvers', requireSuperAdmin, validate(updatePlatformConfigApproversSchema), updatePlatformConfigApprovers);
 
 export default router;

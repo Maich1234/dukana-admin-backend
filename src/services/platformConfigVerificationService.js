@@ -33,7 +33,21 @@ function escapeHtml(str) {
   });
 }
 
-function approverEmails() {
+/**
+ * CEO email + approved email, either of which can supply the code (the same
+ * OTP is broadcast to both). DB-backed so a super admin can manage them from
+ * the UI (see platformConfigController's getPlatformConfigApprovers/
+ * updatePlatformConfigApprovers); PLATFORM_CONFIG_APPROVER_EMAILS is only a
+ * bootstrap fallback for before either is ever set.
+ */
+async function approverEmails() {
+  const { PlatformConfig } = await getSmartDukaModels();
+  const platform = await PlatformConfig.get();
+  const configured = [platform.approverEmails?.ceoEmail, platform.approverEmails?.approvedEmail]
+    .map((e) => (e || '').trim())
+    .filter(Boolean);
+  if (configured.length > 0) return configured;
+
   const raw = process.env.PLATFORM_CONFIG_APPROVER_EMAILS ?? '';
   return raw.split(',').map((e) => e.trim()).filter(Boolean);
 }
@@ -81,9 +95,9 @@ async function sendApprovalEmail(approvers, admin, otp) {
  * if no approver is configured.
  */
 export async function requestPlatformConfigVerification(admin) {
-  const approvers = approverEmails();
+  const approvers = await approverEmails();
   if (approvers.length === 0) {
-    const err = new Error('No platform credential approver is configured. Contact an engineer to set PLATFORM_CONFIG_APPROVER_EMAILS.');
+    const err = new Error('No platform credential approver is configured. Ask a super admin to set the CEO or approved email in Settings.');
     err.statusCode = 500;
     throw err;
   }
