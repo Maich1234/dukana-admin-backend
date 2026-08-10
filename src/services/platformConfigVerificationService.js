@@ -111,13 +111,38 @@ export async function requestPlatformConfigVerification(admin) {
   const otpHash = await bcrypt.hash(otp, BCRYPT_ROUNDS);
   const expiresAt = new Date(Date.now() + OTP_TTL_MS);
 
-  await sendApprovalEmail(approvers, admin, otp);
-
+  // Session exists before the send is even attempted — verifying only ever
+  // needs otpHash/expiresAt, not delivery, so there's no reason to make the
+  // client wait on the send to get a sessionId back.
   const session = await PlatformConfigVerificationSession.create({
     requestedByAdminId: admin._id,
     otpHash,
     expiresAt,
   });
+
+  // The configured mail host (mail.enmail.co) can take ~26-27s just to
+  // acknowledge an accepted message (see email.js's SEND_BUDGET_MS comment)
+  // — awaiting that fully here used to blow past the serverless function's
+  // execution limit and kill the response before the client ever saw
+  // success, even though the mail host had already been handed the message.
+  // Give the send a short window to fail fast (bad SMTP auth, DNS failure —
+  // things that surface in well under a second) and surface that
+  // synchronously; otherwise stop waiting and let it keep running in the
+  // background rather than hold the response open for the mail host's slow
+  // acknowledgment.
+  const sendPromise = sendApprovalEmail(approvers, admin, otp);
+  const RESPONSE_WAIT_MS = 6000;
+  const outcome = await Promise.race([
+    sendPromise.then(() => ({ status: 'sent' }), (err) => ({ status: 'failed', err })),
+    new Promise((resolve) => setTimeout(() => resolve({ status: 'pending' }), RESPONSE_WAIT_MS)),
+  ]);
+
+  if (outcome.status === 'failed') throw outcome.err;
+  if (outcome.status === 'pending') {
+    sendPromise.catch((err) => {
+      console.error('[PlatformConfigVerification] background approval email delivery failed:', err);
+    });
+  }
 
   return { sessionId: session._id.toString() };
 }
