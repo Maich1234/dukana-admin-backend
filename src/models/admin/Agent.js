@@ -30,6 +30,13 @@ const agentSchema = new mongoose.Schema({
     default: '',
     trim: true,
   },
+  // Shown on the printable verification tag (see the public /public/agents
+  // route) alongside the QR code, so a shop owner meeting this agent in
+  // person can match face to photo, not just a name.
+  photoUrl: {
+    type: String,
+    default: '',
+  },
   active: {
     type: Boolean,
     default: true,

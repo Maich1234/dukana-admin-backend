@@ -2,6 +2,8 @@ import Agent from '../../models/admin/Agent.js';
 import generateAgentToken from '../../utils/generateAgentToken.js';
 import { agentRefreshTokenService, RefreshTokenError } from '../../services/refreshTokenService.js';
 import { logAudit } from '../../services/auditLogService.js';
+import { signAgentVerifyToken } from '../../utils/agentVerifyToken.js';
+import cloudinary from '../../config/cloudinary.js';
 
 /** POST /agent/auth/login */
 export const login = async (req, res) => {
@@ -81,6 +83,27 @@ export const getProfile = async (req, res) => {
       name: req.agent.name,
       email: req.agent.email,
       phone: req.agent.phone,
+      photoUrl: req.agent.photoUrl || null,
+      // For the printable verification tag's QR code — see publicController.js.
+      verifyToken: signAgentVerifyToken(req.agent._id),
     },
   });
+};
+
+/** POST /agent/profile/photo — an agent uploading their own photo. */
+export const uploadOwnPhoto = async (req, res) => {
+  if (!req.file) return res.status(400).json({ success: false, message: 'No file uploaded' });
+
+  const result = await new Promise((resolve, reject) => {
+    const stream = cloudinary.uploader.upload_stream(
+      { folder: 'agent-photos', public_id: `agent_${req.agent._id}`, overwrite: true },
+      (error, result) => (error ? reject(error) : resolve(result))
+    );
+    stream.end(req.file.buffer);
+  });
+
+  req.agent.photoUrl = result.secure_url;
+  await req.agent.save();
+
+  res.json({ success: true, data: { photoUrl: req.agent.photoUrl } });
 };

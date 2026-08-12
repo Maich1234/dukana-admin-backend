@@ -1,12 +1,13 @@
 import express from 'express';
 import {
   listAgents, createAgent, getAgent, updateAgent, suspendAgent, reactivateAgent,
-  getAgentShops, getAgentCommissions,
+  getAgentShops, getAgentCommissions, uploadAgentPhoto,
 } from '../../../controllers/admin/agentsController.js';
 import { requirePermission } from '../../../middlewares/adminAuth.js';
 import validate from '../../../middlewares/validate.js';
 import { createAgentSchema, updateAgentSchema } from '../../../validations/agentValidation.js';
 import { suspendReasonSchema } from '../../../validations/common.js';
+import upload from '../../../middlewares/upload.js';
 
 const router = express.Router();
 
@@ -14,6 +15,7 @@ router.get('/', requirePermission('agents.view'), listAgents);
 router.post('/', requirePermission('agents.create'), validate(createAgentSchema), createAgent);
 router.get('/:id', requirePermission('agents.view'), getAgent);
 router.patch('/:id', requirePermission('agents.edit'), validate(updateAgentSchema), updateAgent);
+router.post('/:id/photo', requirePermission('agents.edit'), upload.single('photo'), uploadAgentPhoto);
 router.patch('/:id/suspend', requirePermission('agents.suspend'), validate(suspendReasonSchema), suspendAgent);
 router.patch('/:id/reactivate', requirePermission('agents.suspend'), reactivateAgent);
 router.get('/:id/shops', requirePermission('agents.view'), getAgentShops);

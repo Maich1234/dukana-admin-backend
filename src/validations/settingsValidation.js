@@ -142,3 +142,16 @@ export const verifyPlatformConfigSchema = Joi.object({
     'string.pattern.base': 'Verification code must be 6 digits',
   }),
 }).unknown(false);
+
+// notifyTitle/notifyBody are only required when notify is actually true —
+// so "save the rate without notifying" can't be blocked by empty message
+// fields the admin never intended to fill in, but "notify" can never fire
+// with an empty title/body either.
+export const updateReferralConfigSchema = Joi.object({
+  enabled: Joi.boolean(),
+  percentPerReferral: Joi.number().min(0).max(100),
+  maxStackedPercent: Joi.number().min(0).max(100),
+  notify: Joi.boolean().default(false),
+  notifyTitle: Joi.string().trim().when('notify', { is: true, then: Joi.string().min(1).required(), otherwise: Joi.string().trim().allow('') }),
+  notifyBody: Joi.string().trim().when('notify', { is: true, then: Joi.string().min(1).required(), otherwise: Joi.string().trim().allow('') }),
+}).unknown(false);

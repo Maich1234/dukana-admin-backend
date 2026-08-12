@@ -38,6 +38,16 @@ const platformApproverEmailsSchema = new mongoose.Schema({
   approvedEmail: { type: String, trim: true, lowercase: true, default: '' },
 }, { _id: false });
 
+// Field-for-field copy of the `referral` sub-doc added to
+// smart-duka-backend/src/models/PlatformConfig.js — the owner-to-owner
+// referral program's admin-tunable rate/cap. See settingsRoutes.js's
+// /admin/settings/referral endpoints.
+const platformReferralSchema = new mongoose.Schema({
+  enabled: { type: Boolean, default: false },
+  percentPerReferral: { type: Number, default: 20, min: 0, max: 100 },
+  maxStackedPercent: { type: Number, default: 100, min: 0, max: 100 },
+}, { _id: false });
+
 const platformConfigSchema = new mongoose.Schema({
   key: { type: String, default: 'platform', unique: true },
   mpesa: { type: platformMpesaSchema, default: () => ({}) },
@@ -47,6 +57,7 @@ const platformConfigSchema = new mongoose.Schema({
   gracePeriodDays: { type: Number, default: 3, min: 0 },
   staffGraceExtraDays: { type: Number, default: 7, min: 0 },
   reminderDaysBefore: { type: [Number], default: [7, 3] },
+  referral: { type: platformReferralSchema, default: () => ({}) },
 }, { timestamps: true });
 
 /** Loads the singleton, creating an empty one on first access. */

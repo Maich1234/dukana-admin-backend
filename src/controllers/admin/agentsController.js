@@ -1,10 +1,12 @@
 import Agent from '../../models/admin/Agent.js';
 import Onboarding from '../../models/admin/Onboarding.js';
 import CommissionRecord from '../../models/admin/CommissionRecord.js';
+import cloudinary from '../../config/cloudinary.js';
 import { parsePagination } from '../../utils/pagination.js';
 import { logAudit } from '../../services/auditLogService.js';
 import { agentRefreshTokenService } from '../../services/refreshTokenService.js';
 import { attachDisplayStage, attachShopSummary } from '../../services/onboardingService.js';
+import { signAgentVerifyToken } from '../../utils/agentVerifyToken.js';
 
 /** GET /admin/agents */
 export const listAgents = async (req, res) => {
@@ -69,7 +71,7 @@ export const getAgent = async (req, res) => {
   res.json({
     success: true,
     data: {
-      agent,
+      agent: { ...agent.toObject(), verifyToken: signAgentVerifyToken(agent._id) },
       pipeline: { assignedCount, activeCount, pendingCount, byStage: stageCounts },
       newShopsThisPeriod,
       commissions: {
@@ -79,6 +81,35 @@ export const getAgent = async (req, res) => {
       },
     },
   });
+};
+
+/** POST /admin/agents/:id/photo — an admin setting/replacing an agent's photo. */
+export const uploadAgentPhoto = async (req, res) => {
+  if (!req.file) return res.status(400).json({ success: false, message: 'No file uploaded' });
+
+  const agent = await Agent.findById(req.params.id);
+  if (!agent) return res.status(404).json({ success: false, message: 'Agent not found' });
+
+  const result = await new Promise((resolve, reject) => {
+    const stream = cloudinary.uploader.upload_stream(
+      { folder: 'agent-photos', public_id: `agent_${agent._id}`, overwrite: true },
+      (error, result) => (error ? reject(error) : resolve(result))
+    );
+    stream.end(req.file.buffer);
+  });
+
+  agent.photoUrl = result.secure_url;
+  await agent.save();
+
+  logAudit({
+    adminId: req.admin._id,
+    action: 'admin.agent.photo_updated',
+    entityType: 'Agent',
+    entityId: agent._id,
+    req,
+  }).catch(() => {});
+
+  res.json({ success: true, data: { photoUrl: agent.photoUrl } });
 };
 
 /** PATCH /admin/agents/:id */

@@ -7,6 +7,7 @@ import {
   getPlatformConfig, updatePlatformConfig, getPlatformConfigApprovers, updatePlatformConfigApprovers,
 } from '../../../controllers/admin/settings/platformConfigController.js';
 import { requestVerification, verifyCode } from '../../../controllers/admin/settings/platformConfigVerificationController.js';
+import { getReferralConfig, updateReferralConfig } from '../../../controllers/admin/settings/referralController.js';
 import { requirePermission, requireSuperAdmin } from '../../../middlewares/adminAuth.js';
 import { requirePlatformConfigVerification, requirePlatformConfigVerificationAlways } from '../../../services/platformConfigVerificationService.js';
 import validate from '../../../middlewares/validate.js';
@@ -14,6 +15,7 @@ import { createRateLimitStore } from '../../../utils/rateLimitStore.js';
 import {
   createPlanSchema, updatePlanSchema, createPromotionSchema, updatePromotionSchema,
   createPushCampaignSchema, updatePlatformConfigSchema, updatePlatformConfigApproversSchema, verifyPlatformConfigSchema,
+  updateReferralConfigSchema,
 } from '../../../validations/settingsValidation.js';
 
 const router = express.Router();
@@ -35,6 +37,9 @@ router.get('/push-campaigns', listPushCampaigns);
 router.post('/push-campaigns', validate(createPushCampaignSchema), createPushCampaign);
 router.post('/push-campaigns/:id/send', sendPushCampaign);
 router.patch('/push-campaigns/:id/cancel', cancelPushCampaign);
+
+router.get('/referral', getReferralConfig);
+router.patch('/referral', validate(updateReferralConfigSchema), updateReferralConfig);
 
 // Tighter than the login limiter — each request emails a human approver
 // rather than the requester's own channel, so bursts are both an abuse
