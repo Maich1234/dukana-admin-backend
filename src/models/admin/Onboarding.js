@@ -52,10 +52,13 @@ const onboardingSchema = new mongoose.Schema({
   registeredAt: { type: Date, default: null },
   onboardingStartedAt: { type: Date, default: null },
   becameActiveAt: { type: Date, default: null },
+  // Optional: null for rows the daily cron creates itself from an agent
+  // referral-code redemption (agentReferralLinkService.js) — there is no
+  // acting admin in that case. Every admin-created row still populates it.
   createdBy: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'AdminUser',
-    required: true,
+    default: null,
   },
 }, {
   timestamps: true,

@@ -61,10 +61,21 @@ const commissionRecordSchema = new mongoose.Schema({
   commissionAmount: { type: Number, required: true, min: 0 },
   status: {
     type: String,
-    enum: ['pending', 'approved', 'paid', 'cancelled'],
+    enum: ['pending', 'approved', 'paying', 'paid', 'cancelled'],
     default: 'pending',
     index: true,
   },
+  // How this record was (or is being) paid. Null until a payout is attempted
+  // — 'paying' is always paired with payoutMethod: 'mpesa_b2c'; a manual
+  // "Mark Paid" sets it to 'manual' directly with no 'paying' stop in between.
+  payoutMethod: { type: String, enum: ['manual', 'mpesa_b2c'], default: null },
+  // Set while status is 'paying', to match the result back on the internal
+  // callback from smart-duka-backend (see internal/commissionPayoutsController.js).
+  b2cConversationId: { type: String, index: true, sparse: true },
+  b2cOriginatorConversationId: { type: String, index: true, sparse: true },
+  // Populated when a B2C attempt fails and the record reverts to 'approved' —
+  // cleared implicitly by never being read once a later attempt succeeds.
+  payoutFailureReason: { type: String, default: '' },
   approvedBy: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'AdminUser',
@@ -78,6 +89,10 @@ const commissionRecordSchema = new mongoose.Schema({
   approvedAt: { type: Date, default: null },
   paidAt: { type: Date, default: null },
   cancelledReason: { type: String, default: '', trim: true },
+  // Set when the agent asks to be paid out on an already-approved record.
+  // Purely informational for admin triage — payment still only ever happens
+  // through the existing approve → pay flow below, unchanged.
+  payoutRequestedAt: { type: Date, default: null },
 }, {
   timestamps: true,
 });

@@ -3,6 +3,7 @@ import {
   listShops, getShop, getShopUsers, getShopPayments, getShopActivity,
   updateShop, suspendShop, reactivateShop, lookupShopByUser,
 } from '../../../controllers/admin/shopsController.js';
+import { impersonateUser } from '../../../controllers/admin/impersonationController.js';
 import { requirePermission } from '../../../middlewares/adminAuth.js';
 import validate from '../../../middlewares/validate.js';
 import { updateShopSchema } from '../../../validations/shopValidation.js';
@@ -21,5 +22,6 @@ router.get('/:id/activity', requirePermission('shops.view'), getShopActivity);
 router.patch('/:id', requirePermission('shops.edit'), validate(updateShopSchema), updateShop);
 router.patch('/:id/suspend', requirePermission('shops.suspend'), validate(suspendReasonSchema), suspendShop);
 router.patch('/:id/reactivate', requirePermission('shops.suspend'), reactivateShop);
+router.post('/:shopId/users/:userId/impersonate', requirePermission('shops.impersonate'), validate(suspendReasonSchema), impersonateUser);
 
 export default router;

@@ -9,6 +9,10 @@ import promotionSchema from './promotionSchema.js';
 import pushCampaignSchema from './pushCampaignSchema.js';
 import subscriptionPaymentSchema from './subscriptionPaymentSchema.js';
 import mpesaTransactionSchema from './mpesaTransactionSchema.js';
+import b2cTransactionSchema from './b2cTransactionSchema.js';
+import agentReferralCodeSchema from './agentReferralCodeSchema.js';
+import agentReferralRedemptionSchema from './agentReferralRedemptionSchema.js';
+import employeeReferralPayoutSchema from './employeeReferralPayoutSchema.js';
 
 // Binds every shared schema to the secondary (smart-duka) connection and
 // caches the resulting models — every controller that touches a
@@ -30,6 +34,10 @@ const MODEL_DEFS = [
   ['PushCampaign', pushCampaignSchema],
   ['SubscriptionPayment', subscriptionPaymentSchema],
   ['MpesaTransaction', mpesaTransactionSchema],
+  ['B2CTransaction', b2cTransactionSchema],
+  ['AgentReferralCode', agentReferralCodeSchema],
+  ['AgentReferralRedemption', agentReferralRedemptionSchema],
+  ['EmployeeReferralPayout', employeeReferralPayoutSchema],
 ];
 
 let cachedModels = null;

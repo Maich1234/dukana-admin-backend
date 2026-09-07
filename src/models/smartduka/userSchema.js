@@ -34,6 +34,9 @@ const userSchema = new mongoose.Schema({
   permissions: { type: [String], default: [] },
   commissionEligible: { type: Boolean, default: false },
   fcmTokens: { type: [String], default: [] },
+  myReferralCode: {
+    type: String, unique: true, sparse: true, trim: true, uppercase: true, maxlength: 10,
+  },
   termsAcceptedAt: { type: Date, default: null },
   termsVersion: { type: String, default: null },
   deletionScheduledAt: { type: Date, default: null, index: true },

@@ -118,6 +118,8 @@ export const updatePlatformConfigSchema = Joi.object({
   consumerKey: Joi.string().trim().allow(''),
   consumerSecret: Joi.string().trim().allow(''),
   passkey: Joi.string().trim().allow(''),
+  initiatorName: Joi.string().trim().allow(''),
+  securityCredential: Joi.string().trim().allow(''),
   paystackEnabled: Joi.boolean(),
   paystackPublicKey: Joi.string().trim().allow(''),
   paystackSecretKey: Joi.string().trim().allow(''),
@@ -143,15 +145,37 @@ export const verifyPlatformConfigSchema = Joi.object({
   }),
 }).unknown(false);
 
-// notifyTitle/notifyBody are only required when notify is actually true —
-// so "save the rate without notifying" can't be blocked by empty message
-// fields the admin never intended to fill in, but "notify" can never fire
-// with an empty title/body either.
-export const updateReferralConfigSchema = Joi.object({
+// Three independent referral programs — shop owners, employees, and agents
+// each PATCH their own sub-object, only the keys actually sent change (same
+// partial-merge discipline as updatePlanSchema/updatePromotionSchema
+// above). At least one of the three sub-objects (or notify) must be present
+// so an empty PATCH can't silently no-op.
+const referralAudienceUpdateBase = {
   enabled: Joi.boolean(),
-  percentPerReferral: Joi.number().min(0).max(100),
-  maxStackedPercent: Joi.number().min(0).max(100),
+  startsAt: Joi.date().allow(null),
+  endsAt: Joi.date().allow(null),
+};
+
+// notifyTitle/notifyBody/notifyAudience are only required when notify is
+// actually true — so "save the rates without notifying" can't be blocked by
+// fields the admin never intended to fill in, but "notify" can never fire
+// without knowing who to notify or with an empty title/body.
+export const updateReferralConfigSchema = Joi.object({
+  shopOwner: Joi.object({
+    ...referralAudienceUpdateBase,
+    percentPerReferral: Joi.number().min(0).max(100),
+    maxStackedPercent: Joi.number().min(0).max(100),
+  }).min(1),
+  employee: Joi.object({
+    ...referralAudienceUpdateBase,
+    cashAmount: Joi.number().min(0),
+  }).min(1),
+  agent: Joi.object({
+    ...referralAudienceUpdateBase,
+    trialDays: Joi.number().integer().min(0),
+  }).min(1),
   notify: Joi.boolean().default(false),
   notifyTitle: Joi.string().trim().when('notify', { is: true, then: Joi.string().min(1).required(), otherwise: Joi.string().trim().allow('') }),
   notifyBody: Joi.string().trim().when('notify', { is: true, then: Joi.string().min(1).required(), otherwise: Joi.string().trim().allow('') }),
-}).unknown(false);
+  notifyAudience: Joi.string().valid('owner', 'staff').when('notify', { is: true, then: Joi.required() }),
+}).unknown(false).min(1);

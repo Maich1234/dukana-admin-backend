@@ -7,6 +7,7 @@ import { logAudit } from '../../services/auditLogService.js';
 import { agentRefreshTokenService } from '../../services/refreshTokenService.js';
 import { attachDisplayStage, attachShopSummary } from '../../services/onboardingService.js';
 import { signAgentVerifyToken } from '../../utils/agentVerifyToken.js';
+import { issueAgentReferralCode, ensureAgentReferralCode } from '../../services/agentReferralService.js';
 
 /** GET /admin/agents */
 export const listAgents = async (req, res) => {
@@ -25,6 +26,7 @@ export const listAgents = async (req, res) => {
 /** POST /admin/agents */
 export const createAgent = async (req, res) => {
   const agent = await Agent.create({ ...req.body, createdBy: req.admin._id });
+  await issueAgentReferralCode(agent);
   const response = agent.toObject();
   delete response.password;
 
@@ -47,6 +49,12 @@ export const createAgent = async (req, res) => {
 export const getAgent = async (req, res) => {
   const agent = await Agent.findById(req.params.id).select('-password');
   if (!agent) return res.status(404).json({ success: false, message: 'Agent not found' });
+
+  // Self-healing backfill: an agent created before referral codes existed
+  // otherwise shows a blank code here forever — there's no migration
+  // script, so the first admin view of this agent just fixes it (the daily
+  // cron's syncAgentReferralCodes() also mirrors it if this write races).
+  await ensureAgentReferralCode(agent);
 
   const startOfPeriod = new Date();
   startOfPeriod.setUTCDate(1);

@@ -16,6 +16,7 @@ export const PERMISSION_GROUPS = [
       { value: 'shops.create', label: 'Create shops' },
       { value: 'shops.edit', label: 'Edit shop details' },
       { value: 'shops.suspend', label: 'Suspend / reactivate shops' },
+      { value: 'shops.impersonate', label: 'Log in as a shop owner or staff member' },
     ],
   },
   {
@@ -53,6 +54,13 @@ export const PERMISSION_GROUPS = [
       { value: 'commissions.view', label: 'View commission rules & records' },
       { value: 'commissions.manage', label: 'Manage commission rules & cancel records' },
       { value: 'commissions.approve', label: 'Approve / mark commissions as paid' },
+    ],
+  },
+  {
+    category: 'Referral Payouts',
+    permissions: [
+      { value: 'referral_payouts.view', label: 'View employee referral payouts' },
+      { value: 'referral_payouts.approve', label: 'Mark employee referral payouts as paid' },
     ],
   },
   {

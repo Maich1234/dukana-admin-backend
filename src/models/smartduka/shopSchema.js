@@ -65,6 +65,22 @@ const shopSchema = new mongoose.Schema({
     default: () => DEFAULT_PAYMENT_METHODS.map((m, i) => ({ ...m, order: i })),
   },
   invoiceSeq: { type: Number, default: 0, min: 0 },
+  // referredByCode/referredByShopId/myReferralCode were missing from this
+  // mirror entirely before the tri-audience referral work — added here for
+  // the "field-for-field copy" this file's header promises (a lean() read
+  // through this schema was silently dropping them).
+  referredByCode: {
+    type: String, default: '', trim: true, uppercase: true, maxlength: 40,
+  },
+  referredByType: { type: String, enum: ['shop', 'staff', 'agent', null], default: null },
+  referredByShopId: { type: mongoose.Schema.Types.ObjectId, ref: 'Shop', default: null },
+  referredByStaffId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+  // No ref: Agent lives in this backend's own DB, not the secondary
+  // connection this schema is bound to.
+  referredByAgentId: { type: mongoose.Schema.Types.ObjectId, default: null },
+  myReferralCode: {
+    type: String, unique: true, sparse: true, trim: true, uppercase: true, maxlength: 16,
+  },
 }, { timestamps: true });
 
 export default shopSchema;

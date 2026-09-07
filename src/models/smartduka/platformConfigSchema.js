@@ -15,6 +15,13 @@ const platformMpesaSchema = new mongoose.Schema({
   consumerKey: { type: String },
   consumerSecret: { type: String },
   passkey: { type: String },
+  // B2C (paying agent commissions out) — kept in lockstep with
+  // smart-duka-backend/src/models/PlatformConfig.js's copy. Must NEVER drift:
+  // updatePlatformConfig below does a whole-subdocument reassignment through
+  // THIS schema, so a field missing here gets silently stripped from the DB
+  // document on the next unrelated platform-config save.
+  initiatorName: { type: String, trim: true },
+  securityCredential: { type: String },
   configuredAt: { type: Date },
 }, { _id: false });
 
@@ -39,13 +46,34 @@ const platformApproverEmailsSchema = new mongoose.Schema({
 }, { _id: false });
 
 // Field-for-field copy of the `referral` sub-doc added to
-// smart-duka-backend/src/models/PlatformConfig.js — the owner-to-owner
-// referral program's admin-tunable rate/cap. See settingsRoutes.js's
-// /admin/settings/referral endpoints.
-const platformReferralSchema = new mongoose.Schema({
+// smart-duka-backend/src/models/PlatformConfig.js — three independent
+// referral programs (shop owners, employees, agents), each with its own
+// enable switch and date window. See settingsRoutes.js's
+// /admin/settings/referral endpoints and referralController.js.
+const referralAudienceBaseFields = {
   enabled: { type: Boolean, default: false },
+  startsAt: { type: Date, default: null },
+  endsAt: { type: Date, default: null },
+};
+
+const shopOwnerReferralSchema = new mongoose.Schema({
+  ...referralAudienceBaseFields,
   percentPerReferral: { type: Number, default: 20, min: 0, max: 100 },
   maxStackedPercent: { type: Number, default: 100, min: 0, max: 100 },
+}, { _id: false });
+
+const employeeReferralSchema = new mongoose.Schema({
+  ...referralAudienceBaseFields,
+  cashAmount: { type: Number, default: 0, min: 0 },
+}, { _id: false });
+
+// No reward field — agent payouts stay on CommissionRule/CommissionRecord;
+// this only gates auto-linking an Onboarding row on redemption. trialDays is
+// kept in lockstep with smart-duka-backend/src/models/PlatformConfig.js's
+// copy — see that file's comment on the schema-drift risk.
+const agentReferralSchema = new mongoose.Schema({
+  ...referralAudienceBaseFields,
+  trialDays: { type: Number, default: 30, min: 0 },
 }, { _id: false });
 
 const platformConfigSchema = new mongoose.Schema({
@@ -57,7 +85,11 @@ const platformConfigSchema = new mongoose.Schema({
   gracePeriodDays: { type: Number, default: 3, min: 0 },
   staffGraceExtraDays: { type: Number, default: 7, min: 0 },
   reminderDaysBefore: { type: [Number], default: [7, 3] },
-  referral: { type: platformReferralSchema, default: () => ({}) },
+  referral: {
+    shopOwner: { type: shopOwnerReferralSchema, default: () => ({}) },
+    employee: { type: employeeReferralSchema, default: () => ({}) },
+    agent: { type: agentReferralSchema, default: () => ({}) },
+  },
 }, { timestamps: true });
 
 /** Loads the singleton, creating an empty one on first access. */

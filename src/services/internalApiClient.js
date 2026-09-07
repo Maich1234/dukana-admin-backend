@@ -22,7 +22,7 @@ class InternalApiError extends Error {
 
 const REQUEST_TIMEOUT_MS = 20_000;
 
-async function callInternalApi(path, { method = 'POST' } = {}) {
+async function callInternalApi(path, { method = 'POST', body: requestBody } = {}) {
   const baseUrl = process.env.SMARTDUKA_INTERNAL_API_URL;
   const secret = process.env.INTERNAL_API_SECRET;
 
@@ -39,7 +39,11 @@ async function callInternalApi(path, { method = 'POST' } = {}) {
   try {
     res = await fetch(url, {
       method,
-      headers: { Authorization: `Bearer ${secret}` },
+      headers: {
+        Authorization: `Bearer ${secret}`,
+        ...(requestBody ? { 'Content-Type': 'application/json' } : {}),
+      },
+      body: requestBody ? JSON.stringify(requestBody) : undefined,
       signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
     });
   } catch (err) {
@@ -81,5 +85,29 @@ export const reconcileSubscriptionPayment = (paymentId) =>
  */
 export const dispatchPushCampaign = (campaignId) =>
   callInternalApi(`/internal/push-campaigns/${campaignId}/dispatch`);
+
+/**
+ * POST /internal/impersonation-token — mints a short-lived shop-user access
+ * token so an admin can open the web app already logged in as a shop owner
+ * or staff member. Returns { token, expiresIn, user }.
+ */
+export const mintImpersonationToken = (userId, { adminId, adminEmail, reason }) =>
+  callInternalApi('/internal/impersonation-token', {
+    method: 'POST',
+    body: { userId, adminId, adminEmail, reason },
+  });
+
+/**
+ * POST /internal/b2c/payout — initiates a B2C payment (e.g. an agent
+ * commission payout) from the platform's own Daraja account. Returns
+ * { conversationId, originatorConversationId }; the eventual result arrives
+ * asynchronously via smart-duka-backend pushing to this service's own
+ * POST /internal/commission-payouts/result.
+ */
+export const initiateB2CPayout = ({ reference, phoneNumber, amount, remarks, occasion }) =>
+  callInternalApi('/internal/b2c/payout', {
+    method: 'POST',
+    body: { reference, phoneNumber, amount, remarks, occasion },
+  });
 
 export { InternalApiError };

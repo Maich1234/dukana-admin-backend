@@ -33,6 +33,8 @@ export const getPlatformConfig = async (req, res) => {
         consumerKeyConfigured: isEncrypted(mpesa.consumerKey),
         consumerSecretConfigured: isEncrypted(mpesa.consumerSecret),
         passkeyConfigured: isEncrypted(mpesa.passkey),
+        initiatorName: mpesa.initiatorName ?? '',
+        securityCredentialConfigured: isEncrypted(mpesa.securityCredential),
         configuredAt: mpesa.configuredAt ?? null,
       },
       paystack: {
@@ -62,6 +64,7 @@ export const updatePlatformConfig = async (req, res) => {
   const platform = await PlatformConfig.get();
   const {
     enabled, environment, businessName, shortcode, consumerKey, consumerSecret, passkey,
+    initiatorName, securityCredential,
     paystackEnabled, paystackPublicKey, paystackSecretKey,
     immediateSeatBilling, gracePeriodDays, staffGraceExtraDays, reminderDaysBefore,
   } = req.body;
@@ -74,7 +77,9 @@ export const updatePlatformConfig = async (req, res) => {
   if (consumerKey) mpesa.consumerKey = encrypt(consumerKey);
   if (consumerSecret) mpesa.consumerSecret = encrypt(consumerSecret);
   if (passkey) mpesa.passkey = encrypt(passkey);
-  if (consumerKey || consumerSecret || passkey || enabled !== undefined) mpesa.configuredAt = new Date();
+  if (initiatorName !== undefined) mpesa.initiatorName = initiatorName;
+  if (securityCredential) mpesa.securityCredential = encrypt(securityCredential);
+  if (consumerKey || consumerSecret || passkey || securityCredential || enabled !== undefined) mpesa.configuredAt = new Date();
   platform.mpesa = mpesa;
 
   const paystack = platform.paystack?.toObject ? platform.paystack.toObject() : { ...(platform.paystack ?? {}) };

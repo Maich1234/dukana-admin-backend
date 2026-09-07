@@ -3,6 +3,7 @@ import generateAgentToken from '../../utils/generateAgentToken.js';
 import { agentRefreshTokenService, RefreshTokenError } from '../../services/refreshTokenService.js';
 import { logAudit } from '../../services/auditLogService.js';
 import { signAgentVerifyToken } from '../../utils/agentVerifyToken.js';
+import { ensureAgentReferralCode } from '../../services/agentReferralService.js';
 import cloudinary from '../../config/cloudinary.js';
 
 /** POST /agent/auth/login */
@@ -76,6 +77,10 @@ export const logout = async (req, res) => {
 
 /** GET /agent/auth/me */
 export const getProfile = async (req, res) => {
+  // Self-healing backfill: an agent whose account predates referral codes
+  // sees theirs appear the first time they open their own profile.
+  const code = await ensureAgentReferralCode(req.agent);
+
   res.json({
     success: true,
     data: {
@@ -84,6 +89,7 @@ export const getProfile = async (req, res) => {
       email: req.agent.email,
       phone: req.agent.phone,
       photoUrl: req.agent.photoUrl || null,
+      code,
       // For the printable verification tag's QR code — see publicController.js.
       verifyToken: signAgentVerifyToken(req.agent._id),
     },
