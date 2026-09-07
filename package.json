@@ -10,8 +10,7 @@
     "test": "node --test \"tests/*.test.js\"",
     "sync-indexes": "node scripts/syncIndexes.mjs",
     "seed-roles": "node scripts/seedRoles.mjs",
-    "create-super-admin": "node scripts/createSuperAdminUser.mjs",
-    "migrate-from-smartduka": "node scripts/migrateFromSmartDuka.mjs"
+    "create-super-admin": "node scripts/createSuperAdminUser.mjs"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
