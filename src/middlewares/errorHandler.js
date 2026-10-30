@@ -1,4 +1,5 @@
 const DUPLICATE_KEY_MESSAGES = {
+  'onboardingPayment.method + onboardingPayment.reference': 'This onboarding payment reference is already recorded.',
   email: 'An account with this email address already exists.',
   slug: 'A record with this slug already exists.',
   code: 'A promotion with this code already exists.',

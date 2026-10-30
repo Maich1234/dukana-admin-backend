@@ -49,6 +49,31 @@ const onboardingSchema = new mongoose.Schema({
     type: [reassignmentEntrySchema],
     default: [],
   },
+  training: {
+    completedAt: { type: Date, default: null },
+    attendees: { type: Number, min: 0, default: 0 },
+    productsEntered: { type: Number, min: 0, default: 0 },
+    topics: { type: [String], default: [] },
+    notes: { type: String, default: '' },
+    nextFollowUpAt: { type: Date, default: null },
+    recordedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Agent', default: null },
+    recordedAt: { type: Date, default: null },
+  },
+  // Optional manual collection record. No historical debt or subscription change.
+  onboardingPayment: {
+    type: new mongoose.Schema({
+      amount: { type: Number, enum: [1000], required: true },
+      currency: { type: String, enum: ['KES'], required: true },
+      method: { type: String, enum: ['mpesa', 'cash', 'bank'], required: true },
+      reference: { type: String, trim: true, maxlength: 100, default: '' },
+      paidAt: { type: Date, required: true },
+      recordedAt: { type: Date, required: true },
+      collectedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Agent', required: true },
+      agentName: { type: String, default: '' },
+      notes: { type: String, maxlength: 1000, default: '' },
+    }, { _id: false }),
+    default: null,
+  },
   registeredAt: { type: Date, default: null },
   onboardingStartedAt: { type: Date, default: null },
   becameActiveAt: { type: Date, default: null },
@@ -65,6 +90,7 @@ const onboardingSchema = new mongoose.Schema({
 });
 
 onboardingSchema.index({ agentId: 1, stage: 1 });
+onboardingSchema.index({ 'onboardingPayment.method': 1, 'onboardingPayment.reference': 1 }, { unique: true, partialFilterExpression: { 'onboardingPayment.reference': { $gt: '' } } });
 // Sparse: many onboarding rows have no shop yet (still a lead), and only
 // once linked must a shop map to at most one onboarding record.
 onboardingSchema.index({ shopId: 1 }, { unique: true, sparse: true });

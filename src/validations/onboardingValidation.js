@@ -38,3 +38,19 @@ export const reassignOnboardingSchema = Joi.object({
   agentId: objectId().required(),
   reason: Joi.string().trim().allow('').default(''),
 }).unknown(false);
+
+export const recordTrainingSchema = Joi.object({
+  completedAt: Joi.date().iso().max('now').allow(null).required(),
+  attendees: Joi.number().integer().min(0).max(1000).required(),
+  productsEntered: Joi.number().integer().min(0).max(1000000).required(),
+  topics: Joi.array().items(Joi.string().trim().min(1).max(120)).max(20).required(),
+  notes: Joi.string().trim().max(4000).allow('').required(),
+  nextFollowUpAt: Joi.date().iso().allow(null).required(),
+  expectedUpdatedAt: Joi.date().iso().required(),
+}).unknown(false);
+export const recordOnboardingPaymentSchema = Joi.object({
+  method: Joi.string().valid('mpesa', 'cash', 'bank').required(),
+  reference: Joi.string().trim().max(100).when('method', { is: 'cash', then: Joi.string().allow('').default(''), otherwise: Joi.string().min(3).required() }),
+  paidAt: Joi.date().iso().max('now').required(),
+  notes: Joi.string().trim().max(1000).allow('').default(''),
+}).unknown(false);
