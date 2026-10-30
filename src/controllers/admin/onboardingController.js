@@ -142,7 +142,8 @@ export const deleteOnboarding = async (req, res) => {
     return res.status(409).json({ success: false, message: 'Only a lead that hasn\'t progressed can be deleted.' });
   }
 
-  await onboarding.deleteOne();
+  const deleted = await Onboarding.deleteOne({ _id: onboarding._id, stage: 'lead', shopId: null, onboardingPayment: null, 'training.recordedAt': null });
+  if (!deleted.deletedCount) return res.status(409).json({ success: false, message: 'A linked lead or a lead with training or payment records cannot be deleted.' });
 
   logAudit({
     adminId: req.admin._id,
