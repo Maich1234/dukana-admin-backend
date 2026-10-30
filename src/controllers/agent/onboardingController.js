@@ -58,19 +58,20 @@ export const updateOnboarding = async (req, res) => {
 
 /** Scope is rechecked in the write, so reassignment cannot race collection. */
 export async function recordTraining(req, res) {
-  const { expectedUpdatedAt, ...training } = req.body;
-  const updated = await Onboarding.findOneAndUpdate({ _id: req.params.id, agentId: req.agent._id, updatedAt: expectedUpdatedAt }, { $set: { training: { ...training, recordedBy: req.agent._id, recordedAt: new Date() } } }, { new: true, runValidators: true });
+  const { expectedTrainingRevision, ...training } = req.body;
+  const updated = await Onboarding.findOneAndUpdate({ _id: req.params.id, agentId: req.agent._id, ...(expectedTrainingRevision === 0 ? { $or: [{ trainingRevision: 0 }, { trainingRevision: { $exists: false } }] } : { trainingRevision: expectedTrainingRevision }) }, { $inc: { trainingRevision: 1 }, $set: { training: { ...training, recordedBy: req.agent._id, recordedAt: new Date() } } }, { new: true, runValidators: true });
   if (!updated) return res.status(409).json({ success: false, message: 'This record changed or was reassigned. Refresh before saving.' });
+  logAudit({ shopId: updated.shopId ?? undefined, action: 'agent.onboarding.training_recorded', entityType: 'Onboarding', entityId: updated._id, details: { agentId: String(req.agent._id), revision: updated.trainingRevision }, req }).catch(() => {});
   res.json({ success: true, data: updated });
 }
 export async function recordOnboardingPayment(req, res) {
-  const payment = { ...req.body, amount: 1000, currency: 'KES', collectedBy: req.agent._id, agentName: req.agent.name ?? '', recordedAt: new Date() };
+  const payment = { ...req.body, reference: String(req.body.reference ?? '').trim().toUpperCase(), amount: 1000, currency: 'KES', collectedBy: req.agent._id, agentName: req.agent.name ?? '', recordedAt: new Date() };
   const updated = await Onboarding.findOneAndUpdate({ _id: req.params.id, agentId: req.agent._id, onboardingPayment: null }, { $set: { onboardingPayment: payment } }, { new: true, runValidators: true });
   if (!updated) {
     const existing = await Onboarding.findOne({ _id: req.params.id, agentId: req.agent._id }).lean();
     if (!existing) return res.status(404).json({ success: false, message: 'Onboarding record not found.' });
     const old = existing.onboardingPayment;
-    if (old && String(old.collectedBy) === String(req.agent._id) && old.method === payment.method && old.reference === payment.reference && new Date(old.paidAt).getTime() === new Date(payment.paidAt).getTime() && old.notes === payment.notes) return res.json({ success: true, data: existing, replayed: true });
+    if (old && String(old.collectedBy) === String(req.agent._id) && old.method === payment.method && String(old.reference ?? '').trim().toUpperCase() === payment.reference && new Date(old.paidAt).getTime() === new Date(payment.paidAt).getTime() && old.notes === payment.notes) return res.json({ success: true, data: existing, replayed: true });
     return res.status(409).json({ success: false, message: 'An onboarding payment is already recorded. It cannot be collected or overwritten again.' });
   }
   logAudit({ shopId: updated.shopId ?? undefined, action: 'agent.onboarding.fee_recorded', entityType: 'Onboarding', entityId: updated._id, details: { amount: 1000, currency: 'KES', agentId: String(req.agent._id), method: payment.method, reference: payment.reference }, req }).catch(() => {});
