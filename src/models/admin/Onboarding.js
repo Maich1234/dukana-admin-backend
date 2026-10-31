@@ -23,7 +23,9 @@ const onboardingSchema = new mongoose.Schema({
   // no signup webhook in V1).
   shopId: {
     type: mongoose.Schema.Types.ObjectId,
-    default: null,
+    // Sparse unique indexes exclude missing fields, but still index explicit null.
+    // Leave unlinked leads absent so many new leads can coexist.
+    default: undefined,
   },
   agentId: {
     type: mongoose.Schema.Types.ObjectId,
@@ -49,15 +51,18 @@ const onboardingSchema = new mongoose.Schema({
     type: [reassignmentEntrySchema],
     default: [],
   },
+  // Defaults on legacy hydrated docs can be written by unrelated save() calls.
+  // Keep these absent until the conditional training endpoint writes them.
+  trainingRevision: { type: Number },
   training: {
-    completedAt: { type: Date, default: null },
-    attendees: { type: Number, min: 0, default: 0 },
-    productsEntered: { type: Number, min: 0, default: 0 },
-    topics: { type: [String], default: [] },
-    notes: { type: String, default: '' },
-    nextFollowUpAt: { type: Date, default: null },
-    recordedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Agent', default: null },
-    recordedAt: { type: Date, default: null },
+    completedAt: { type: Date, default: undefined },
+    attendees: { type: Number, min: 0, default: undefined },
+    productsEntered: { type: Number, min: 0, default: undefined },
+    topics: { type: [String], default: undefined },
+    notes: { type: String, default: undefined },
+    nextFollowUpAt: { type: Date, default: undefined },
+    recordedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Agent', default: undefined },
+    recordedAt: { type: Date, default: undefined },
   },
   // Optional manual collection record. No historical debt or subscription change.
   onboardingPayment: {
@@ -90,7 +95,7 @@ const onboardingSchema = new mongoose.Schema({
 });
 
 onboardingSchema.index({ agentId: 1, stage: 1 });
-onboardingSchema.index({ 'onboardingPayment.method': 1, 'onboardingPayment.reference': 1 }, { unique: true, partialFilterExpression: { 'onboardingPayment.reference': { $gt: '' } } });
+onboardingSchema.index({ 'onboardingPayment.method': 1, 'onboardingPayment.reference': 1 }, { name: 'onboarding_payment_reference', unique: true, collation: { locale: 'en', strength: 2 }, partialFilterExpression: { 'onboardingPayment.reference': { $gt: '' } } });
 // Sparse: many onboarding rows have no shop yet (still a lead), and only
 // once linked must a shop map to at most one onboarding record.
 onboardingSchema.index({ shopId: 1 }, { unique: true, sparse: true });
