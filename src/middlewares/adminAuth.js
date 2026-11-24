@@ -1,5 +1,7 @@
 import jwt from 'jsonwebtoken';
+import AdminRefreshToken from '../models/admin/AdminRefreshToken.js';
 import AdminUser from '../models/admin/AdminUser.js';
+import { activeAdminSessionFilter } from '../services/refreshTokenService.js';
 import { SUPER_ADMIN_ROLE_SLUG } from '../constants/permissions.js';
 
 /**
@@ -17,7 +19,7 @@ export const protectAdmin = async (req, res, next) => {
 
   try {
     const token = header.split(' ')[1];
-    const decoded = jwt.verify(token, process.env.ADMIN_JWT_SECRET);
+    const decoded = jwt.verify(token, process.env.ADMIN_JWT_SECRET, { maxAge: 60 });
     if (decoded.type !== 'admin') {
       return res.status(401).json({ success: false, message: 'Not authorized' });
     }
@@ -35,7 +37,13 @@ export const protectAdmin = async (req, res, next) => {
       return res.status(401).json({ success: false, message: 'This account has no assigned role. Contact a super admin.' });
     }
 
+    if (typeof decoded.sessionId !== 'string' || !await AdminRefreshToken.exists({
+      admin: admin._id, sessionId: decoded.sessionId, ...activeAdminSessionFilter(),
+    })) {
+      return res.status(401).json({ success: false, message: 'Session expired. Please sign in again.' });
+    }
     req.admin = admin;
+    req.adminSessionId = decoded.sessionId;
     next();
   } catch (error) {
     return res.status(401).json({ success: false, message: 'Not authorized, token failed' });
@@ -56,15 +64,7 @@ export const requirePermission = (permissionKey) => (req, res, next) => {
   return res.status(403).json({ success: false, message: 'Access denied. You do not have permission to access this resource.' });
 };
 
-/**
- * Escalation guard for POST/PATCH /admin/admins: `admins.create`/`admins.edit`
- * lets a permitted admin manage another admin's name/email/active flag, but
- * changing roleId (including granting super_admin) is hardcoded to
- * requireSuperAdmin — no permission bypasses it. This closes the exact
- * privilege-escalation vector this design exists to prevent: a Section Admin
- * with `admins.edit` granting themselves (or anyone) a more powerful role.
- * A no-op if the request doesn't touch roleId at all.
- */
+/** Only a super admin can assign a role when creating an admin account. */
 export const requireSuperAdminForRoleChange = (req, res, next) => {
   if (req.body?.roleId === undefined) return next();
   if (req.admin?.roleId?.slug === SUPER_ADMIN_ROLE_SLUG) return next();

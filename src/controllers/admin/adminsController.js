@@ -54,8 +54,16 @@ export const updateAdmin = async (req, res) => {
   if (!admin) return res.status(404).json({ success: false, message: 'Admin not found' });
 
   const { name, email, password, roleId, active } = req.body;
+  const emailChanged = email !== undefined && email !== admin.email;
+  const roleChanged = roleId !== undefined && String(roleId) !== String(admin.roleId);
+  const activeChanged = active !== undefined && active !== admin.active;
+  const sensitiveChange = emailChanged || roleChanged || activeChanged || password !== undefined;
+  if (req.admin.roleId.slug !== SUPER_ADMIN_ROLE_SLUG &&
+      (sensitiveChange || await isSuperAdminTarget(admin))) {
+    return res.status(403).json({ success: false, message: 'Only a super admin can make this change.' });
+  }
 
-  if (roleId !== undefined) {
+  if (roleChanged) {
     const role = await Role.findById(roleId);
     if (!role) return res.status(400).json({ success: false, message: 'That role does not exist.' });
   }
@@ -68,17 +76,18 @@ export const updateAdmin = async (req, res) => {
   const before = { roleId: String(admin.roleId), active: admin.active };
 
   if (name !== undefined) admin.name = name;
-  if (email !== undefined) admin.email = email;
-  if (password !== undefined) admin.password = password;
-  if (roleId !== undefined) admin.roleId = roleId;
-  if (active !== undefined) admin.active = active;
+  if (emailChanged) admin.email = email;
+  if (roleChanged) admin.roleId = roleId;
+  if (activeChanged) admin.active = active;
 
-  await admin.save();
-
-  if (active === false && before.active !== false) {
-    // Deactivating an admin should end their existing sessions immediately,
-    // not just block new logins.
-    await adminRefreshTokenService.revokeAllSessions(admin._id, 'admin_force_logout');
+  if (sensitiveChange) {
+    await AdminUser.db.transaction(async (session) => {
+      if (password !== undefined) admin.password = password;
+      await admin.save({ session });
+      await adminRefreshTokenService.revokeAllSessions(admin._id, 'admin_force_logout', session);
+    });
+  } else {
+    await admin.save();
   }
 
   logAudit({
@@ -95,9 +104,13 @@ export const updateAdmin = async (req, res) => {
   res.json({ success: true, data: response });
 };
 
+async function isSuperAdminTarget(admin) {
+  const role = await Role.findById(admin.roleId).select('slug');
+  return role?.slug === SUPER_ADMIN_ROLE_SLUG;
+}
+
 async function isLastActiveSuperAdmin(admin, { roleId, active }) {
-  const currentRole = await Role.findById(admin.roleId).select('slug');
-  if (currentRole?.slug !== SUPER_ADMIN_ROLE_SLUG) return false;
+  if (!(await isSuperAdminTarget(admin))) return false;
 
   const demoting = roleId !== undefined && String(roleId) !== String(admin.roleId);
   const deactivating = active === false;
@@ -117,6 +130,10 @@ export const suspendAdmin = async (req, res) => {
   const admin = await AdminUser.findById(req.params.id);
   if (!admin) return res.status(404).json({ success: false, message: 'Admin not found' });
 
+  if (req.admin.roleId.slug !== SUPER_ADMIN_ROLE_SLUG && await isSuperAdminTarget(admin)) {
+    return res.status(403).json({ success: false, message: 'Only a super admin can manage this account.' });
+  }
+
   if (String(admin._id) === String(req.admin._id)) {
     return res.status(400).json({ success: false, message: 'You cannot suspend your own account.' });
   }
@@ -124,9 +141,11 @@ export const suspendAdmin = async (req, res) => {
     return res.status(409).json({ success: false, message: 'Cannot deactivate the last active super admin.' });
   }
 
-  admin.active = false;
-  await admin.save();
-  await adminRefreshTokenService.revokeAllSessions(admin._id, 'admin_force_logout');
+  await AdminUser.db.transaction(async (session) => {
+    admin.active = false;
+    await admin.save({ session });
+    await adminRefreshTokenService.revokeAllSessions(admin._id, 'admin_force_logout', session);
+  });
 
   logAudit({
     adminId: req.admin._id,
@@ -144,6 +163,10 @@ export const suspendAdmin = async (req, res) => {
 export const reactivateAdmin = async (req, res) => {
   const admin = await AdminUser.findById(req.params.id);
   if (!admin) return res.status(404).json({ success: false, message: 'Admin not found' });
+
+  if (req.admin.roleId.slug !== SUPER_ADMIN_ROLE_SLUG && await isSuperAdminTarget(admin)) {
+    return res.status(403).json({ success: false, message: 'Only a super admin can manage this account.' });
+  }
 
   admin.active = true;
   await admin.save();

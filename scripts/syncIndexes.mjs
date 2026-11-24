@@ -1,6 +1,6 @@
 /**
  * Applies every schema-declared index to the admin database ONLY —
- * src/models/admin/*.js. Never touches src/models/smartduka/* — this
+ * src/models/admin/*.js. Never touches src/models/duqana/* — this
  * backend doesn't own those collections' indexes (smart-duka-backend does,
  * via its own sync-indexes script) and must never create, change, or drop
  * one there.
@@ -20,7 +20,7 @@
  */
 import 'dotenv/config';
 import { readdir } from 'node:fs/promises';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import path from 'node:path';
 import mongoose from 'mongoose';
 
@@ -34,7 +34,7 @@ const SKIP_FILES = new Set(['refreshTokenSchemaFactory.js']);
 
 async function registerAllModels() {
   const files = (await readdir(MODELS_DIR)).filter((f) => f.endsWith('.js') && !SKIP_FILES.has(f));
-  await Promise.all(files.map((f) => import(path.join(MODELS_DIR, f))));
+  await Promise.all(files.map((f) => import(pathToFileURL(path.join(MODELS_DIR, f)).href)));
   return files.length;
 }
 

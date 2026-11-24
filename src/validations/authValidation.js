@@ -5,6 +5,11 @@ export const adminLoginSchema = Joi.object({
   password: Joi.string().required(),
 }).unknown(false);
 
+export const adminVerifyLoginSchema = Joi.object({
+  challengeId: Joi.string().guid({ version: 'uuidv4' }).required(),
+  code: Joi.string().pattern(/^\d{6}$/).required(),
+}).unknown(false);
+
 export const agentLoginSchema = Joi.object({
   email: Joi.string().email().lowercase().trim().required(),
   password: Joi.string().required(),

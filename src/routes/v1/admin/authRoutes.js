@@ -1,10 +1,10 @@
 import express from 'express';
 import rateLimit from 'express-rate-limit';
-import { login, refresh, logout, getProfile } from '../../../controllers/admin/authController.js';
+import { login, verifyLogin, refresh, logout, getProfile, recordActivity } from '../../../controllers/admin/authController.js';
 import { protectAdmin } from '../../../middlewares/adminAuth.js';
 import validate from '../../../middlewares/validate.js';
 import { createRateLimitStore } from '../../../utils/rateLimitStore.js';
-import { adminLoginSchema, refreshTokenSchema, logoutSchema } from '../../../validations/authValidation.js';
+import { adminLoginSchema, adminVerifyLoginSchema, refreshTokenSchema, logoutSchema } from '../../../validations/authValidation.js';
 
 const router = express.Router();
 
@@ -21,8 +21,10 @@ const loginLimiter = rateLimit({
 });
 
 router.post('/login', loginLimiter, validate(adminLoginSchema), login);
+router.post('/login/verify', loginLimiter, validate(adminVerifyLoginSchema), verifyLogin);
 router.post('/refresh', validate(refreshTokenSchema), refresh);
 router.post('/logout', validate(logoutSchema), logout);
+router.post('/activity', protectAdmin, recordActivity);
 router.get('/me', protectAdmin, getProfile);
 
 export default router;

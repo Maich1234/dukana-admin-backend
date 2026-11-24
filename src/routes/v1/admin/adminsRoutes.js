@@ -9,7 +9,7 @@ const router = express.Router();
 
 router.get('/', requirePermission('admins.view'), listAdmins);
 router.post('/', requirePermission('admins.create'), requireSuperAdminForRoleChange, validate(createAdminUserSchema), createAdmin);
-router.patch('/:id', requirePermission('admins.edit'), requireSuperAdminForRoleChange, validate(updateAdminUserSchema), updateAdmin);
+router.patch('/:id', requirePermission('admins.edit'), validate(updateAdminUserSchema), updateAdmin);
 router.patch('/:id/suspend', requirePermission('admins.suspend'), validate(suspendReasonSchema), suspendAdmin);
 router.patch('/:id/reactivate', requirePermission('admins.suspend'), reactivateAdmin);
 
